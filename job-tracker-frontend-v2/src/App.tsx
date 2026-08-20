@@ -8,7 +8,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { useJobs } from "./hooks/useJobs";
-import { JobStatus } from "./types";
+import { JobStatus, SortOption } from "./types";
 import JobCard from "./components/JobCard";
 import ScraperPanel from "./components/ScraperPanel";
 
@@ -20,6 +20,13 @@ const STATUSES: { value: JobStatus | "all"; label: string }[] = [
   { value: "rejected", label: "Rejected" },
 ];
 
+const SORT_OPTIONS: { value: SortOption; label: string }[] = [
+  { value: "newest", label: "Most Recent" },
+  { value: "oldest", label: "Oldest First" },
+  { value: "title-asc", label: "Title (A–Z)" },
+  { value: "title-desc", label: "Title (Z–A)" },
+];
+
 export default function App() {
   const {
     jobs,
@@ -28,6 +35,8 @@ export default function App() {
     error,
     filters,
     setFilters,
+    sortBy,
+    setSortBy,
     updateStatus,
     updateNotes,
     deleteJob,
@@ -161,6 +170,18 @@ export default function App() {
                   </button>
                 ))}
               </div>
+
+              <select
+                className="sort-select"
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value as SortOption)}
+              >
+                {SORT_OPTIONS.map((o) => (
+                  <option key={o.value} value={o.value}>
+                    {o.label}
+                  </option>
+                ))}
+              </select>
             </div>
           </section>
 

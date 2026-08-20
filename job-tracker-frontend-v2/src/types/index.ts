@@ -35,3 +35,5 @@ export interface JobFilters {
   status: JobStatus | 'all';
   search: string;
 }
+
+export type SortOption = 'newest' | 'oldest' | 'title-asc' | 'title-desc';

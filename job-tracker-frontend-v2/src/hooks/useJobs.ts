@@ -1,6 +1,13 @@
-import { useState, useEffect, useCallback } from 'react';
-import { Job, JobStats, JobStatus, JobFilters } from '../types';
+import { useState, useEffect, useCallback, useMemo } from 'react';
+import { Job, JobStats, JobStatus, JobFilters, SortOption } from '../types';
 import * as api from '../api/jobsApi';
+
+const SORTERS: Record<SortOption, (a: Job, b: Job) => number> = {
+  newest:     (a, b) => (b.dateScraped ?? '').localeCompare(a.dateScraped ?? ''),
+  oldest:     (a, b) => (a.dateScraped ?? '').localeCompare(b.dateScraped ?? ''),
+  'title-asc':  (a, b) => a.jobTitle.localeCompare(b.jobTitle),
+  'title-desc': (a, b) => b.jobTitle.localeCompare(a.jobTitle),
+};
 
 export function useJobs() {
   const [jobs, setJobs]       = useState<Job[]>([]);
@@ -8,6 +15,9 @@ export function useJobs() {
   const [loading, setLoading] = useState(true);
   const [error, setError]     = useState<string | null>(null);
   const [filters, setFilters] = useState<JobFilters>({ status: 'all', search: '' });
+  const [sortBy, setSortBy]   = useState<SortOption>('newest');
+
+  const sortedJobs = useMemo(() => [...jobs].sort(SORTERS[sortBy]), [jobs, sortBy]);
 
   const loadJobs = useCallback(async () => {
     try {
@@ -51,5 +61,5 @@ export function useJobs() {
     catch { loadJobs(); setError('Failed to delete job'); }
   };
 
-  return { jobs, stats, loading, error, filters, setFilters, updateStatus, updateNotes, deleteJob, refresh: loadJobs };
+  return { jobs: sortedJobs, stats, loading, error, filters, setFilters, sortBy, setSortBy, updateStatus, updateNotes, deleteJob, refresh: loadJobs };
 }

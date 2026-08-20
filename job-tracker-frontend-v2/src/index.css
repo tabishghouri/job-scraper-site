@@ -556,6 +556,26 @@ body {
   color: var(--paper);
 }
 
+.sort-select {
+  padding: 0.5rem 0.75rem;
+  background: var(--paper-card);
+  border: 1px solid var(--ink-15);
+  border-radius: var(--r-md);
+  font-family: var(--font-sans);
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--ink-70);
+  cursor: pointer;
+  outline: none;
+}
+.sort-select:hover {
+  color: var(--ink);
+}
+.sort-select:focus {
+  border-color: var(--brass-light);
+  box-shadow: 0 0 0 3px var(--brass-dim);
+}
+
 .results-meta {
   font-family: var(--font-mono);
   font-size: 0.65rem;
