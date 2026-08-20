@@ -79,7 +79,10 @@ public class ScraperController {
      */
     @PostMapping(value = "/run", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public SseEmitter runScraper(
-            @RequestHeader(value = "X-API-Key", required = false) String apiKey) {
+            @RequestHeader(value = "X-API-Key", required = false) String apiKey,
+            @RequestParam(value = "maxJobs", required = false) Integer maxJobs) {
+
+        final Integer clampedMaxJobs = maxJobs == null ? null : Math.max(0, Math.min(50, maxJobs));
 
         // Validate API key
         if (!securityConfig.scraperApiKey.equals(apiKey)) {
@@ -108,11 +111,16 @@ public class ScraperController {
             Process process = null;
             try {
                 // Build the command
-                ProcessBuilder pb = new ProcessBuilder(pythonPath, scraperScript);
+                java.util.List<String> command = new java.util.ArrayList<>(java.util.List.of(pythonPath, scraperScript));
+                if (clampedMaxJobs != null) {
+                    command.add("--max-jobs");
+                    command.add(String.valueOf(clampedMaxJobs));
+                }
+                ProcessBuilder pb = new ProcessBuilder(command);
                 pb.directory(new java.io.File(scraperDir));
                 pb.redirectErrorStream(true);  // merge stderr into stdout
 
-                log.info("Starting scraper: {} {} in {}", pythonPath, scraperScript, scraperDir);
+                log.info("Starting scraper: {} in {}", command, scraperDir);
                 emitter.send(SseEmitter.event()
                     .name("log")
                     .data("🚀 Starting scraper..."));

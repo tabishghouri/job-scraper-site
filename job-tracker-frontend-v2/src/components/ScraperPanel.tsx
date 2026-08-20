@@ -14,6 +14,7 @@ export default function ScraperPanel({ onComplete }: Props) {
   const [running, setRunning]   = useState(false);
   const [logs, setLogs]         = useState<LogLine[]>([]);
   const [open, setOpen]         = useState(false);
+  const [maxJobs, setMaxJobs]   = useState(25);
   const logEndRef               = useRef<HTMLDivElement>(null);
 
   useEffect(() => { logEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [logs]);
@@ -29,7 +30,7 @@ export default function ScraperPanel({ onComplete }: Props) {
     addLog('sys', 'Connecting to scraper process...');
 
     try {
-      const response = await fetch(`${API_BASE}/scraper/run`, {
+      const response = await fetch(`${API_BASE}/scraper/run?maxJobs=${maxJobs}`, {
         method: 'POST',
         headers: { 'X-API-Key': API_KEY, 'Accept': 'text/event-stream' },
       });
@@ -101,14 +102,28 @@ export default function ScraperPanel({ onComplete }: Props) {
             </button>
           )}
           {SCRAPER_AVAILABLE ? (
-            <button
-              className={`btn-run${running ? ' running' : ''}`}
-              onClick={runScraper}
-              disabled={running}
-            >
-              {running ? <Square size={13} /> : <Play size={13} />}
-              {running ? 'Running...' : 'Run Scraper'}
-            </button>
+            <>
+              <label style={{ display: 'flex', gap: '0.4rem', alignItems: 'center', fontSize: '0.75rem' }}>
+                Limit
+                <input
+                  type="range"
+                  min={0}
+                  max={50}
+                  value={maxJobs}
+                  disabled={running}
+                  onChange={(e) => setMaxJobs(Number(e.target.value))}
+                />
+                <span style={{ minWidth: '1.5em', textAlign: 'right' }}>{maxJobs}</span>
+              </label>
+              <button
+                className={`btn-run${running ? ' running' : ''}`}
+                onClick={runScraper}
+                disabled={running}
+              >
+                {running ? <Square size={13} /> : <Play size={13} />}
+                {running ? 'Running...' : 'Run Scraper'}
+              </button>
+            </>
           ) : (
             <span className="scraper-bar-sub" style={{ fontSize: '0.75rem' }}>
               Run locally — <code>python main.py</code> in scraper/
