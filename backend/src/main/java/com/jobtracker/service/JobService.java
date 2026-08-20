@@ -1,5 +1,7 @@
 package com.jobtracker.service;
 
+import com.google.cloud.storage.Blob;
+import com.google.cloud.storage.Bucket;
 import com.jobtracker.model.Job;
 import com.jobtracker.repository.JobRepository;
 import lombok.RequiredArgsConstructor;
@@ -17,6 +19,7 @@ import java.util.concurrent.ExecutionException;
 public class JobService {
 
     private final JobRepository repo;
+    private final Bucket bucket;
 
     private static final List<String> VALID_STATUSES =
             List.of("saved", "applied", "interviewing", "rejected");
@@ -61,8 +64,26 @@ public class JobService {
         return repo.updateFields(id, Map.of("notes", notes != null ? notes : ""));
     }
 
+    /**
+     * Deletes a job and its tailored resume from Firebase Storage.
+     * Only removes the cloud copy — the scraper's local .tex/.pdf files and
+     * SQLite record are left alone, so a deleted job is still recoverable locally.
+     */
     public boolean deleteJob(String id) throws ExecutionException, InterruptedException {
+        repo.findById(id).ifPresent(job -> deleteResumeFromStorage(job.getResumePdf()));
         return repo.deleteById(id);
+    }
+
+    private void deleteResumeFromStorage(String resumePdf) {
+        if (resumePdf == null || resumePdf.isBlank()) return;
+        try {
+            Blob blob = bucket.get("resumes/" + resumePdf);
+            if (blob != null && blob.delete()) {
+                log.info("Deleted resume from Storage: resumes/{}", resumePdf);
+            }
+        } catch (Exception e) {
+            log.warn("Failed to delete resume from Storage for '{}' (job delete continues): {}", resumePdf, e.getMessage());
+        }
     }
 
     public Map<String, Long> getStats() throws ExecutionException, InterruptedException {
