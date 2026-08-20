@@ -3,6 +3,9 @@ import { Play, Square, Terminal, ChevronDown, ChevronUp } from 'lucide-react';
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8080/api';
 const API_KEY  = import.meta.env.VITE_SCRAPER_API_KEY ?? '';
+// The scraper runs as a subprocess on whatever machine the backend is on — only
+// possible when backend and scraper share a filesystem, i.e. local dev.
+const SCRAPER_AVAILABLE = API_BASE.includes('localhost') || API_BASE.includes('127.0.0.1');
 
 interface LogLine { type: 'log' | 'done' | 'error' | 'sys'; text: string; }
 interface Props { onComplete: () => void; }
@@ -97,14 +100,20 @@ export default function ScraperPanel({ onComplete }: Props) {
               {open ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
             </button>
           )}
-          <button
-            className={`btn-run${running ? ' running' : ''}`}
-            onClick={runScraper}
-            disabled={running}
-          >
-            {running ? <Square size={13} /> : <Play size={13} />}
-            {running ? 'Running...' : 'Run Scraper'}
-          </button>
+          {SCRAPER_AVAILABLE ? (
+            <button
+              className={`btn-run${running ? ' running' : ''}`}
+              onClick={runScraper}
+              disabled={running}
+            >
+              {running ? <Square size={13} /> : <Play size={13} />}
+              {running ? 'Running...' : 'Run Scraper'}
+            </button>
+          ) : (
+            <span className="scraper-bar-sub" style={{ fontSize: '0.75rem' }}>
+              Run locally — <code>python main.py</code> in scraper/
+            </span>
+          )}
         </div>
       </div>
 
