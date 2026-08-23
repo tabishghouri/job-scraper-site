@@ -6,11 +6,16 @@ import {
   Briefcase,
   AlertCircle,
   Trash2,
+  Settings,
+  LogOut,
 } from "lucide-react";
 import { useJobs } from "./hooks/useJobs";
+import { useAuth } from "./hooks/useAuth";
 import { JobStatus, SortOption } from "./types";
 import JobCard from "./components/JobCard";
 import ScraperPanel from "./components/ScraperPanel";
+import SettingsPanel from "./components/SettingsPanel";
+import LoginPage from "./components/LoginPage";
 
 const STATUSES: { value: JobStatus | "all"; label: string }[] = [
   { value: "all", label: "All" },
@@ -28,6 +33,26 @@ const SORT_OPTIONS: { value: SortOption; label: string }[] = [
 ];
 
 export default function App() {
+  const { user, loading: authLoading, logOut } = useAuth();
+
+  if (authLoading) {
+    return (
+      <div className="layout">
+        <div className="state-center" style={{ paddingTop: "6rem" }}>
+          <div className="spinner" />
+        </div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return <LoginPage />;
+  }
+
+  return <Dashboard onLogOut={logOut} />;
+}
+
+function Dashboard({ onLogOut }: { onLogOut: () => void }) {
   const {
     jobs,
     stats,
@@ -44,6 +69,7 @@ export default function App() {
   } = useJobs();
 
   const [searchInput, setSearchInput] = useState("");
+  const [showSettings, setShowSettings] = useState(false);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -96,6 +122,16 @@ export default function App() {
               >
                 <RefreshCw size={15} />
               </button>
+              <button
+                className="btn btn-icon"
+                onClick={() => setShowSettings((s) => !s)}
+                title="Scraper setup"
+              >
+                <Settings size={15} />
+              </button>
+              <button className="btn btn-icon" onClick={onLogOut} title="Log out">
+                <LogOut size={15} />
+              </button>
             </div>
           </div>
         </div>
@@ -130,6 +166,9 @@ export default function App() {
               </div>
             </section>
           )}
+
+          {/* ── Settings ── */}
+          {showSettings && <SettingsPanel onClose={() => setShowSettings(false)} />}
 
           {/* ── Scraper ── */}
           <ScraperPanel onComplete={refresh} />

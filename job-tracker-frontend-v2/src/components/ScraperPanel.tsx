@@ -1,8 +1,8 @@
 import { useState, useRef, useEffect } from 'react';
 import { Play, Square, Terminal, ChevronDown, ChevronUp } from 'lucide-react';
+import { auth } from '../firebase';
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8080/api';
-const API_KEY  = import.meta.env.VITE_SCRAPER_API_KEY ?? '';
 // The scraper runs as a subprocess on whatever machine the backend is on — only
 // possible when backend and scraper share a filesystem, i.e. local dev.
 const SCRAPER_AVAILABLE = API_BASE.includes('localhost') || API_BASE.includes('127.0.0.1');
@@ -30,9 +30,10 @@ export default function ScraperPanel({ onComplete }: Props) {
     addLog('sys', 'Connecting to scraper process...');
 
     try {
+      const token = await auth.currentUser?.getIdToken();
       const response = await fetch(`${API_BASE}/scraper/run?maxJobs=${maxJobs}`, {
         method: 'POST',
-        headers: { 'X-API-Key': API_KEY, 'Accept': 'text/event-stream' },
+        headers: { Authorization: `Bearer ${token}`, 'Accept': 'text/event-stream' },
       });
 
       if (!response.ok) {
