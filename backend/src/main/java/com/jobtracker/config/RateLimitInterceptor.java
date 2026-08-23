@@ -19,15 +19,12 @@ import java.time.Duration;
 import java.util.Objects;
 
 /**
- * Intercepts every API request and enforces two security rules:
+ * Rate limits every API request at N requests/minute per IP.
+ * Uses Token Bucket algorithm: bucket starts full, each request consumes one
+ * token, tokens refill at a fixed rate. Empty bucket = 429 Too Many Requests.
  *
- * 1. POST /api/jobs (scraper endpoint) — requires X-API-Key header.
- *    Only your Python scraper knows this key. No key = 401 Unauthorized.
- *
- * 2. All other endpoints — rate limited at N requests/minute per IP.
- *    Uses Token Bucket algorithm: bucket starts full, each request
- *    consumes one token, tokens refill at a fixed rate.
- *    Empty bucket = 429 Too Many Requests.
+ * Runs after AuthInterceptor (order 2 vs 1), which handles who's allowed to
+ * call what at all — this only throttles volume.
  */
 @Slf4j
 @Component
@@ -35,14 +32,13 @@ import java.util.Objects;
 public class RateLimitInterceptor implements HandlerInterceptor, WebMvcConfigurer {
 
     private final CacheManager cacheManager;
-    private final SecurityConfig securityConfig;
 
     @Value("${app.rate-limit.requests-per-minute:30}")
     private int requestsPerMinute;
 
     @Override
     public void addInterceptors(InterceptorRegistry registry) {
-        registry.addInterceptor(this).addPathPatterns("/api/**");
+        registry.addInterceptor(this).addPathPatterns("/api/**").order(2);
     }
 
     @Override
@@ -50,23 +46,6 @@ public class RateLimitInterceptor implements HandlerInterceptor, WebMvcConfigure
                              HttpServletResponse response,
                              Object handler) throws Exception {
 
-        String method = request.getMethod();
-        String path   = request.getRequestURI();
-
-        // ── API key check for scraper endpoint ────────────────────────────────
-        if ("POST".equals(method) && "/api/jobs".equals(path)) {
-            String apiKey = request.getHeader("X-API-Key");
-            if (!securityConfig.scraperApiKey.equals(apiKey)) {
-                log.warn("Rejected POST /api/jobs — bad API key from {}", getClientIp(request));
-                response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-                response.setContentType("application/json");
-                response.getWriter().write("{\"error\":\"Invalid API key\"}");
-                return false;
-            }
-            return true; // valid key, skip rate limit for scraper
-        }
-
-        // ── IP rate limiting for all other endpoints ──────────────────────────
         String clientIp = getClientIp(request);
         Bucket bucket   = getOrCreateBucket(clientIp);
 

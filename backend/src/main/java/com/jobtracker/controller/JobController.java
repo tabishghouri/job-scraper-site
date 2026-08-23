@@ -13,13 +13,17 @@ import java.util.Map;
 
 /**
  * REST API — exposes endpoints consumed by the React frontend and Python scraper.
+ * Every job is scoped to the caller's uid, resolved by AuthInterceptor from either
+ * a Firebase ID token (browser) or a personal API key (scraper) and passed in as
+ * a request attribute — routes here never see or trust a uid from the client itself.
  *
- * GET    /api/jobs              → all jobs (?status=applied, ?search=shopify)
+ * GET    /api/jobs              → all jobs for the caller (?status=applied, ?search=shopify)
  * GET    /api/jobs/stats        → dashboard counts
  * GET    /api/jobs/{id}         → single job
  * POST   /api/jobs              → create (scraper only, requires X-API-Key)
  * PATCH  /api/jobs/{id}/status  → update status
  * PATCH  /api/jobs/{id}/notes   → update notes
+ * PATCH  /api/jobs/{id}/pdfurl  → update resume PDF URL (scraper only)
  * DELETE /api/jobs/{id}         → delete
  */
 @Slf4j
@@ -32,10 +36,11 @@ public class JobController {
 
     @PatchMapping("/{id}/pdfurl")
     public ResponseEntity<?> updatePdfUrl(
+            @RequestAttribute("uid") String uid,
             @PathVariable String id,
             @RequestBody Map<String, String> body) {
         try {
-            return jobService.updateFields(id, Map.of("resumePdfUrl", body.getOrDefault("resumePdfUrl", "")))
+            return jobService.updateFields(uid, id, Map.of("resumePdfUrl", body.getOrDefault("resumePdfUrl", "")))
                     .map(ResponseEntity::ok)
                     .orElse(ResponseEntity.notFound().build());
         } catch (Exception e) {
@@ -45,12 +50,13 @@ public class JobController {
 
     @GetMapping
     public ResponseEntity<?> getAllJobs(
+            @RequestAttribute("uid") String uid,
             @RequestParam(required = false) String status,
             @RequestParam(required = false) String search) {
         try {
             List<Job> jobs = (search != null && !search.isBlank())
-                    ? jobService.searchJobs(search)
-                    : jobService.getAllJobs(status);
+                    ? jobService.searchJobs(uid, search)
+                    : jobService.getAllJobs(uid, status);
             return ResponseEntity.ok(jobs);
         } catch (Exception e) {
             log.error("getAllJobs failed", e);
@@ -59,9 +65,9 @@ public class JobController {
     }
 
     @GetMapping("/stats")
-    public ResponseEntity<?> getStats() {
+    public ResponseEntity<?> getStats(@RequestAttribute("uid") String uid) {
         try {
-            return ResponseEntity.ok(jobService.getStats());
+            return ResponseEntity.ok(jobService.getStats(uid));
         } catch (Exception e) {
             log.error("getStats failed", e);
             return ResponseEntity.internalServerError().body(Map.of("error", "Failed to fetch stats"));
@@ -69,9 +75,9 @@ public class JobController {
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<?> getJob(@PathVariable String id) {
+    public ResponseEntity<?> getJob(@RequestAttribute("uid") String uid, @PathVariable String id) {
         try {
-            return jobService.getJobById(id)
+            return jobService.getJobById(uid, id)
                     .map(ResponseEntity::ok)
                     .orElse(ResponseEntity.notFound().build());
         } catch (Exception e) {
@@ -80,9 +86,9 @@ public class JobController {
     }
 
     @PostMapping
-    public ResponseEntity<?> createJob(@RequestBody Job job) {
+    public ResponseEntity<?> createJob(@RequestAttribute("uid") String uid, @RequestBody Job job) {
         try {
-            return ResponseEntity.status(HttpStatus.CREATED).body(jobService.saveJob(job));
+            return ResponseEntity.status(HttpStatus.CREATED).body(jobService.saveJob(uid, job));
         } catch (Exception e) {
             log.error("createJob failed", e);
             return ResponseEntity.internalServerError().body(Map.of("error", "Failed to save job"));
@@ -91,12 +97,13 @@ public class JobController {
 
     @PatchMapping("/{id}/status")
     public ResponseEntity<?> updateStatus(
+            @RequestAttribute("uid") String uid,
             @PathVariable String id,
             @RequestBody Map<String, String> body) {
         try {
             String status = body.get("status");
             if (status == null) return ResponseEntity.badRequest().body(Map.of("error", "Missing status"));
-            return jobService.updateStatus(id, status)
+            return jobService.updateStatus(uid, id, status)
                     .map(ResponseEntity::ok)
                     .orElse(ResponseEntity.notFound().build());
         } catch (IllegalArgumentException e) {
@@ -108,10 +115,11 @@ public class JobController {
 
     @PatchMapping("/{id}/notes")
     public ResponseEntity<?> updateNotes(
+            @RequestAttribute("uid") String uid,
             @PathVariable String id,
             @RequestBody Map<String, String> body) {
         try {
-            return jobService.updateNotes(id, body.get("notes"))
+            return jobService.updateNotes(uid, id, body.get("notes"))
                     .map(ResponseEntity::ok)
                     .orElse(ResponseEntity.notFound().build());
         } catch (Exception e) {
@@ -120,9 +128,9 @@ public class JobController {
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<?> deleteJob(@PathVariable String id) {
+    public ResponseEntity<?> deleteJob(@RequestAttribute("uid") String uid, @PathVariable String id) {
         try {
-            return jobService.deleteJob(id)
+            return jobService.deleteJob(uid, id)
                     ? ResponseEntity.noContent().build()
                     : ResponseEntity.notFound().build();
         } catch (Exception e) {

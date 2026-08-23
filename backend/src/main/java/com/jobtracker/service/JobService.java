@@ -24,44 +24,44 @@ public class JobService {
     private static final List<String> VALID_STATUSES =
             List.of("saved", "applied", "interviewing", "rejected");
 
-    public Optional<Job> updateFields(String id, Map<String, Object> fields)
+    public Optional<Job> updateFields(String uid, String id, Map<String, Object> fields)
         throws ExecutionException, InterruptedException {
-        return repo.updateFields(id, fields);
-    }
-    
-    public List<Job> getAllJobs(String status) throws ExecutionException, InterruptedException {
-        return repo.findAll(status);
+        return repo.updateFields(uid, id, fields);
     }
 
-    public Optional<Job> getJobById(String id) throws ExecutionException, InterruptedException {
-        return repo.findById(id);
+    public List<Job> getAllJobs(String uid, String status) throws ExecutionException, InterruptedException {
+        return repo.findAll(uid, status);
     }
 
-    public List<Job> searchJobs(String keyword) throws ExecutionException, InterruptedException {
-        return repo.search(keyword);
+    public Optional<Job> getJobById(String uid, String id) throws ExecutionException, InterruptedException {
+        return repo.findById(uid, id);
     }
 
-    public Job saveJob(Job job) throws ExecutionException, InterruptedException {
-        if (job.getJobUrl() != null && repo.existsByJobUrl(job.getJobUrl())) {
+    public List<Job> searchJobs(String uid, String keyword) throws ExecutionException, InterruptedException {
+        return repo.search(uid, keyword);
+    }
+
+    public Job saveJob(String uid, Job job) throws ExecutionException, InterruptedException {
+        if (job.getJobUrl() != null && repo.existsByJobUrl(uid, job.getJobUrl())) {
             log.info("Duplicate skipped: {}", job.getJobUrl());
-            return repo.findByJobUrl(job.getJobUrl()).orElse(job);
+            return repo.findByJobUrl(uid, job.getJobUrl()).orElse(job);
         }
         if (job.getStatus() == null || job.getStatus().isBlank()) {
             job.setStatus("saved");
         }
-        return repo.save(job);
+        return repo.save(uid, job);
     }
 
-    public Optional<Job> updateStatus(String id, String status)
+    public Optional<Job> updateStatus(String uid, String id, String status)
             throws ExecutionException, InterruptedException {
         if (!VALID_STATUSES.contains(status.toLowerCase()))
             throw new IllegalArgumentException("Invalid status: " + status);
-        return repo.updateFields(id, Map.of("status", status.toLowerCase()));
+        return repo.updateFields(uid, id, Map.of("status", status.toLowerCase()));
     }
 
-    public Optional<Job> updateNotes(String id, String notes)
+    public Optional<Job> updateNotes(String uid, String id, String notes)
             throws ExecutionException, InterruptedException {
-        return repo.updateFields(id, Map.of("notes", notes != null ? notes : ""));
+        return repo.updateFields(uid, id, Map.of("notes", notes != null ? notes : ""));
     }
 
     /**
@@ -69,24 +69,24 @@ public class JobService {
      * Only removes the cloud copy — the scraper's local .tex/.pdf files and
      * SQLite record are left alone, so a deleted job is still recoverable locally.
      */
-    public boolean deleteJob(String id) throws ExecutionException, InterruptedException {
-        repo.findById(id).ifPresent(job -> deleteResumeFromStorage(job.getResumePdf()));
-        return repo.deleteById(id);
+    public boolean deleteJob(String uid, String id) throws ExecutionException, InterruptedException {
+        repo.findById(uid, id).ifPresent(job -> deleteResumeFromStorage(uid, job.getResumePdf()));
+        return repo.deleteById(uid, id);
     }
 
-    private void deleteResumeFromStorage(String resumePdf) {
+    private void deleteResumeFromStorage(String uid, String resumePdf) {
         if (resumePdf == null || resumePdf.isBlank()) return;
         try {
-            Blob blob = bucket.get("resumes/" + resumePdf);
+            Blob blob = bucket.get("resumes/" + uid + "/" + resumePdf);
             if (blob != null && blob.delete()) {
-                log.info("Deleted resume from Storage: resumes/{}", resumePdf);
+                log.info("Deleted resume from Storage: resumes/{}/{}", uid, resumePdf);
             }
         } catch (Exception e) {
             log.warn("Failed to delete resume from Storage for '{}' (job delete continues): {}", resumePdf, e.getMessage());
         }
     }
 
-    public Map<String, Long> getStats() throws ExecutionException, InterruptedException {
-        return repo.getStats();
+    public Map<String, Long> getStats(String uid) throws ExecutionException, InterruptedException {
+        return repo.getStats(uid);
     }
 }

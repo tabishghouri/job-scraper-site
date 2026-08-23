@@ -1,7 +1,5 @@
 package com.jobtracker.controller;
 
-import com.jobtracker.config.SecurityConfig;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
@@ -29,11 +27,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
  */
 @Slf4j
 @RestController
-@RequiredArgsConstructor
 @RequestMapping("/api/scraper")
 public class ScraperController {
-
-    private final SecurityConfig securityConfig;
 
     // Path to the Python executable in the scraper's venv
     // Windows: path to venv python.exe
@@ -74,25 +69,13 @@ public class ScraperController {
      * Each log line becomes an SSE event the frontend can display in real time.
      * When the process finishes, a "done" event is sent.
      *
-     * Protected by X-API-Key — same key the Python scraper uses.
-     * The frontend sends this key from an env variable.
+     * Protected by AuthInterceptor (X-API-Key, same personal key the caller's
+     * local scraper uses) — a request with no valid key never reaches this method.
      */
     @PostMapping(value = "/run", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    public SseEmitter runScraper(
-            @RequestHeader(value = "X-API-Key", required = false) String apiKey,
-            @RequestParam(value = "maxJobs", required = false) Integer maxJobs) {
+    public SseEmitter runScraper(@RequestParam(value = "maxJobs", required = false) Integer maxJobs) {
 
         final Integer clampedMaxJobs = maxJobs == null ? null : Math.max(0, Math.min(50, maxJobs));
-
-        // Validate API key
-        if (!securityConfig.scraperApiKey.equals(apiKey)) {
-            SseEmitter emitter = new SseEmitter();
-            try {
-                emitter.send(SseEmitter.event().name("error").data("Unauthorized"));
-                emitter.complete();
-            } catch (Exception ignored) {}
-            return emitter;
-        }
 
         // Prevent concurrent runs
         if (!isRunning.compareAndSet(false, true)) {

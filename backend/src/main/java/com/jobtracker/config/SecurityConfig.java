@@ -9,13 +9,9 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
  * CORS configuration — allows the React frontend to call this API.
  * Allowed origins come from app.cors.allowed-origins (CORS_ALLOWED_ORIGINS env var),
  * so deploying to a new frontend URL is a config change, not a code change.
- * Also exposes the scraper API key so the interceptor can read it.
  */
 @Configuration
 public class SecurityConfig implements WebMvcConfigurer {
-
-    @Value("${app.scraper.api-key}")
-    public String scraperApiKey;
 
     @Value("${app.cors.allowed-origins}")
     private String[] allowedOrigins;

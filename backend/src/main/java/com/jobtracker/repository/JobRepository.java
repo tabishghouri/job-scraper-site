@@ -12,16 +12,19 @@ import java.util.concurrent.ExecutionException;
 import java.util.stream.Collectors;
 
 /**
- * Firestore data access layer.
+ * Firestore data access layer. Every job lives under its owner's uid, never
+ * in a shared collection, so isolation is structural rather than a filter
+ * that could be forgotten on some query.
  *
  * All Firestore SDK calls are async (return ApiFuture<T>).
  * We call .get() to block and wait — simpler for a personal project.
  *
  * Firestore structure:
  *   firestore/
- *   └── jobs/          ← collection
- *       ├── {docId}/   ← one document per job
- *       └── {docId}/
+ *   └── users/{uid}/
+ *       └── jobs/          ← collection
+ *           ├── {docId}/   ← one document per job
+ *           └── {docId}/
  */
 @Slf4j
 @Repository
@@ -29,11 +32,14 @@ import java.util.stream.Collectors;
 public class JobRepository {
 
     private final Firestore firestore;
-    private static final String COLLECTION = "jobs";
 
-    /** Returns all jobs, optionally filtered by status. Ordered newest first. */
-    public List<Job> findAll(String status) throws ExecutionException, InterruptedException {
-        CollectionReference col = firestore.collection(COLLECTION);
+    private CollectionReference jobsCollection(String uid) {
+        return firestore.collection("users").document(uid).collection("jobs");
+    }
+
+    /** Returns all jobs for uid, optionally filtered by status. Ordered newest first. */
+    public List<Job> findAll(String uid, String status) throws ExecutionException, InterruptedException {
+        CollectionReference col = jobsCollection(uid);
         Query query = (status != null && !status.isBlank())
                 ? col.whereEqualTo("status", status)
                 : col;
@@ -45,31 +51,31 @@ public class JobRepository {
                 .collect(Collectors.toList());
     }
 
-    /** Finds a single job by Firestore document ID. */
-    public Optional<Job> findById(String id) throws ExecutionException, InterruptedException {
-        DocumentSnapshot doc = firestore.collection(COLLECTION).document(id).get().get();
+    /** Finds a single job by Firestore document ID, scoped to uid. */
+    public Optional<Job> findById(String uid, String id) throws ExecutionException, InterruptedException {
+        DocumentSnapshot doc = jobsCollection(uid).document(id).get().get();
         return doc.exists() ? Optional.of(toJob(doc)) : Optional.empty();
     }
 
-    /** Checks if a job with this URL already exists (deduplication). */
-    public boolean existsByJobUrl(String jobUrl) throws ExecutionException, InterruptedException {
-        return !firestore.collection(COLLECTION)
+    /** Checks if a job with this URL already exists for uid (deduplication). */
+    public boolean existsByJobUrl(String uid, String jobUrl) throws ExecutionException, InterruptedException {
+        return !jobsCollection(uid)
                 .whereEqualTo("jobUrl", jobUrl)
                 .limit(1).get().get().isEmpty();
     }
 
-    /** Finds a job by URL — returns it when a duplicate is detected. */
-    public Optional<Job> findByJobUrl(String jobUrl) throws ExecutionException, InterruptedException {
-        QuerySnapshot snap = firestore.collection(COLLECTION)
+    /** Finds a job by URL for uid — returns it when a duplicate is detected. */
+    public Optional<Job> findByJobUrl(String uid, String jobUrl) throws ExecutionException, InterruptedException {
+        QuerySnapshot snap = jobsCollection(uid)
                 .whereEqualTo("jobUrl", jobUrl).limit(1).get().get();
         return snap.isEmpty() ? Optional.empty() : Optional.of(toJob(snap.getDocuments().get(0)));
     }
 
-    /** Creates a new Firestore document with auto-generated ID. */
-    public Job save(Job job) throws ExecutionException, InterruptedException {
-        DocumentReference ref = firestore.collection(COLLECTION).add(toMap(job)).get();
+    /** Creates a new Firestore document with auto-generated ID under uid. */
+    public Job save(String uid, Job job) throws ExecutionException, InterruptedException {
+        DocumentReference ref = jobsCollection(uid).add(toMap(job)).get();
         job.setId(ref.getId());
-        log.info("Saved to Firestore: {} @ {} ({})", job.getJobTitle(), job.getCompanyName(), ref.getId());
+        log.info("Saved to Firestore: {} @ {} ({}) for uid {}", job.getJobTitle(), job.getCompanyName(), ref.getId(), uid);
         return job;
     }
 
@@ -77,38 +83,38 @@ public class JobRepository {
      * Partially updates a document — only the provided fields are changed.
      * All other fields remain untouched.
      */
-    public Optional<Job> updateFields(String id, Map<String, Object> fields)
+    public Optional<Job> updateFields(String uid, String id, Map<String, Object> fields)
             throws ExecutionException, InterruptedException {
-        DocumentReference ref = firestore.collection(COLLECTION).document(id);
+        DocumentReference ref = jobsCollection(uid).document(id);
         if (!ref.get().get().exists()) return Optional.empty();
         ref.update(fields).get();
         return Optional.of(toJob(ref.get().get()));
     }
 
-    /** Deletes a document. Returns false if it didn't exist. */
-    public boolean deleteById(String id) throws ExecutionException, InterruptedException {
-        DocumentReference ref = firestore.collection(COLLECTION).document(id);
+    /** Deletes a document for uid. Returns false if it didn't exist. */
+    public boolean deleteById(String uid, String id) throws ExecutionException, InterruptedException {
+        DocumentReference ref = jobsCollection(uid).document(id);
         if (!ref.get().get().exists()) return false;
         ref.delete().get();
         return true;
     }
 
     /**
-     * In-memory keyword search across title and company name.
+     * In-memory keyword search across title and company name, scoped to uid.
      * Firestore doesn't support native full-text search — fine for personal use.
      */
-    public List<Job> search(String keyword) throws ExecutionException, InterruptedException {
+    public List<Job> search(String uid, String keyword) throws ExecutionException, InterruptedException {
         String lower = keyword.toLowerCase();
-        return findAll(null).stream()
+        return findAll(uid, null).stream()
                 .filter(j ->
                     (j.getJobTitle() != null && j.getJobTitle().toLowerCase().contains(lower)) ||
                     (j.getCompanyName() != null && j.getCompanyName().toLowerCase().contains(lower)))
                 .collect(Collectors.toList());
     }
 
-    /** Counts jobs by each status for the dashboard. */
-    public Map<String, Long> getStats() throws ExecutionException, InterruptedException {
-        List<Job> all = findAll(null);
+    /** Counts uid's jobs by each status for the dashboard. */
+    public Map<String, Long> getStats(String uid) throws ExecutionException, InterruptedException {
+        List<Job> all = findAll(uid, null);
         return Map.of(
             "total",        (long) all.size(),
             "saved",        all.stream().filter(j -> "saved".equals(j.getStatus())).count(),
