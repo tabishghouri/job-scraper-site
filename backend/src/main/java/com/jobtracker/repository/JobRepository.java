@@ -147,7 +147,8 @@ public class JobRepository {
         j.setDateScraped(d.getString("dateScraped"));
         j.setStatus(d.getString("status") != null ? d.getString("status") : "saved");
         j.setNotes(d.getString("notes"));
-        j.setResumePdfUrl(d.getString("resumePdfUrl"));
+        // resumePdfUrl is never persisted — JobService computes a fresh signed
+        // URL from resumePdf on every read instead of storing a long-lived link.
         return j;
     }
 
@@ -171,7 +172,6 @@ public class JobRepository {
         putNN(m, "dateScraped",     j.getDateScraped());
         m.put("status", j.getStatus() != null ? j.getStatus() : "saved");
         putNN(m, "notes", j.getNotes());
-        putNN(m, "resumePdfUrl", j.getResumePdfUrl());
         return m;
     }
 

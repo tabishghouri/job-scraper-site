@@ -40,11 +40,11 @@ public class JobController {
             @PathVariable String id,
             @RequestBody Map<String, String> body) {
         try {
-            return jobService.updateFields(uid, id, Map.of("resumePdfUrl", body.getOrDefault("resumePdfUrl", "")))
+            return jobService.updateResumeFilename(uid, id, body.get("resumePdf"))
                     .map(ResponseEntity::ok)
                     .orElse(ResponseEntity.notFound().build());
         } catch (Exception e) {
-            return ResponseEntity.internalServerError().body(Map.of("error", "Failed to update PDF URL"));
+            return ResponseEntity.internalServerError().body(Map.of("error", "Failed to update resume"));
         }
     }
 
