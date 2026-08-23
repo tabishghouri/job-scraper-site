@@ -69,8 +69,9 @@ public class ScraperController {
      * Each log line becomes an SSE event the frontend can display in real time.
      * When the process finishes, a "done" event is sent.
      *
-     * Protected by AuthInterceptor (X-API-Key, same personal key the caller's
-     * local scraper uses) — a request with no valid key never reaches this method.
+     * Protected by AuthInterceptor (the browser's Firebase ID token, same as
+     * every other frontend-facing route) — an unauthenticated request never
+     * reaches this method.
      */
     @PostMapping(value = "/run", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public SseEmitter runScraper(@RequestParam(value = "maxJobs", required = false) Integer maxJobs) {
