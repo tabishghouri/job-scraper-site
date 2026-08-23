@@ -37,10 +37,25 @@ export const updateJobNotes = (id: string, notes: string): Promise<Job> =>
 export const deleteJob = (id: string): Promise<void> =>
   apiFetch<void>(`/jobs/${id}`, { method: 'DELETE' });
 
-export interface Profile { uid: string; hasApiKey: boolean; apiKeyLast4: string | null; }
+export type JobLevel = 'internship' | 'entry_level';
+
+export interface Profile {
+  uid: string;
+  hasApiKey: boolean;
+  apiKeyLast4: string | null;
+  searchQueries: string[];
+  locations: string[];
+  jobLevel: JobLevel;
+}
 export interface RegeneratedKey { uid: string; apiKey: string; }
 
 export const fetchProfile = (): Promise<Profile> => apiFetch<Profile>('/me');
 
 export const regenerateApiKey = (): Promise<RegeneratedKey> =>
   apiFetch<RegeneratedKey>('/me/regenerate-key', { method: 'POST' });
+
+export const updateSearchConfig = (searchQueries: string[], locations: string[], jobLevel: JobLevel): Promise<Profile> =>
+  apiFetch<Profile>('/me/search-config', {
+    method: 'PATCH',
+    body: JSON.stringify({ searchQueries, locations, jobLevel }),
+  });

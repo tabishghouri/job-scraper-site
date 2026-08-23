@@ -1,5 +1,7 @@
 package com.jobtracker.controller;
 
+import com.jobtracker.service.UserService;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
@@ -24,11 +26,15 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * Endpoints:
  *   POST /api/scraper/run     → starts the scraper, streams logs via SSE
  *   GET  /api/scraper/status  → returns whether scraper is currently running
+ *   GET  /api/scraper/config  → this uid's custom search keywords/locations/level
  */
 @Slf4j
 @RestController
+@RequiredArgsConstructor
 @RequestMapping("/api/scraper")
 public class ScraperController {
+
+    private final UserService userService;
 
     // Path to the Python executable in the scraper's venv
     // Windows: path to venv python.exe
@@ -58,6 +64,23 @@ public class ScraperController {
             "running", isRunning.get(),
             "message", isRunning.get() ? "Scraper is running" : "Scraper is idle"
         ));
+    }
+
+    /**
+     * GET /api/scraper/config
+     *
+     * Returns the calling account's custom search keywords/locations/job level,
+     * fetched by the Python scraper at startup via its personal X-API-Key.
+     * Empty searchQueries/locations mean "use the scraper's built-in defaults".
+     */
+    @GetMapping("/config")
+    public ResponseEntity<?> getConfig(@RequestAttribute("uid") String uid) {
+        try {
+            return ResponseEntity.ok(userService.getSearchConfig(uid));
+        } catch (Exception e) {
+            log.error("getConfig failed", e);
+            return ResponseEntity.internalServerError().body(Map.of("error", "Failed to fetch search config"));
+        }
     }
 
     /**

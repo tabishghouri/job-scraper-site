@@ -18,8 +18,9 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
  *
  * Two mechanisms depending on who's calling:
  *  - The scraper (a human's local Python script) can't do OAuth refresh, so it
- *    sends a personal X-API-Key header instead — POST /api/jobs and
- *    PATCH .../pdfurl, the only two endpoints it ever calls directly.
+ *    sends a personal X-API-Key header instead — POST /api/jobs,
+ *    PATCH .../pdfurl, and GET /api/scraper/config, the only endpoints it
+ *    ever calls directly.
  *  - Everything else — including POST /api/scraper/run, which is the *browser*
  *    asking the backend to spawn the scraper subprocess, not the scraper
  *    calling in itself — is the logged-in browser, sending a Firebase ID
@@ -52,7 +53,8 @@ public class AuthInterceptor implements HandlerInterceptor, WebMvcConfigurer {
 
         boolean isScraperRoute =
                 ("POST".equals(method) && "/api/jobs".equals(path)) ||
-                ("PATCH".equals(method) && path.endsWith("/pdfurl"));
+                ("PATCH".equals(method) && path.endsWith("/pdfurl")) ||
+                ("GET".equals(method) && "/api/scraper/config".equals(path));
 
         String uid = isScraperRoute
                 ? apiKeyService.resolveUid(request.getHeader("X-API-Key"))
