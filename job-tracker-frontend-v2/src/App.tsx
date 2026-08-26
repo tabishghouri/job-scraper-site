@@ -62,6 +62,9 @@ function Dashboard({ onLogOut }: { onLogOut: () => void }) {
     setFilters,
     sortBy,
     setSortBy,
+    companyFilter,
+    setCompanyFilter,
+    companies,
     updateStatus,
     updateNotes,
     deleteJob,
@@ -212,6 +215,19 @@ function Dashboard({ onLogOut }: { onLogOut: () => void }) {
 
               <select
                 className="sort-select"
+                value={companyFilter}
+                onChange={(e) => setCompanyFilter(e.target.value)}
+              >
+                <option value="">All Companies</option>
+                {companies.map((c) => (
+                  <option key={c} value={c}>
+                    {c}
+                  </option>
+                ))}
+              </select>
+
+              <select
+                className="sort-select"
                 value={sortBy}
                 onChange={(e) => setSortBy(e.target.value as SortOption)}
               >
@@ -260,6 +276,7 @@ function Dashboard({ onLogOut }: { onLogOut: () => void }) {
                 {jobs.length} position{jobs.length !== 1 ? "s" : ""}
                 {filters.search && ` matching "${filters.search}"`}
                 {filters.status !== "all" && ` · ${filters.status}`}
+                {companyFilter && ` · ${companyFilter}`}
               </p>
             )}
 

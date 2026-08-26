@@ -16,8 +16,17 @@ export function useJobs() {
   const [error, setError]     = useState<string | null>(null);
   const [filters, setFilters] = useState<JobFilters>({ status: 'all', search: '' });
   const [sortBy, setSortBy]   = useState<SortOption>('newest');
+  const [companyFilter, setCompanyFilter] = useState<string>('');
 
-  const sortedJobs = useMemo(() => [...jobs].sort(SORTERS[sortBy]), [jobs, sortBy]);
+  const companies = useMemo(
+    () => [...new Set(jobs.map(j => j.companyName).filter(Boolean))].sort((a, b) => a.localeCompare(b)),
+    [jobs]
+  );
+
+  const sortedJobs = useMemo(() => {
+    const scoped = companyFilter ? jobs.filter(j => j.companyName === companyFilter) : jobs;
+    return [...scoped].sort(SORTERS[sortBy]);
+  }, [jobs, sortBy, companyFilter]);
 
   const loadJobs = useCallback(async () => {
     try {
@@ -61,5 +70,5 @@ export function useJobs() {
     catch { loadJobs(); setError('Failed to delete job'); }
   };
 
-  return { jobs: sortedJobs, stats, loading, error, filters, setFilters, sortBy, setSortBy, updateStatus, updateNotes, deleteJob, refresh: loadJobs };
+  return { jobs: sortedJobs, stats, loading, error, filters, setFilters, sortBy, setSortBy, companyFilter, setCompanyFilter, companies, updateStatus, updateNotes, deleteJob, refresh: loadJobs };
 }
